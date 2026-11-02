@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Uji Kelayakan Login</title>
+<style>
+  :root {
+    --latar: #f6f7f9;
+    --kartu: #ffffff;
+    --teks: #1d2330;
+    --redup: #5b6475;
+    --garis: #d9dde5;
+    --aksen: #1a5fb4;
+    --lulus: #1b7a3d;
+    --gagal: #b3261e;
+    --lulusLatar: #e6f4ea;
+    --gagalLatar: #fce8e6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --latar: #14171d;
+      --kartu: #1d222b;
+      --teks: #e7eaf0;
+      --redup: #a2abbb;
+      --garis: #323a48;
+      --aksen: #7ab0ff;
+      --lulus: #6fd08c;
+      --gagal: #ff8a80;
+      --lulusLatar: #17301f;
+      --gagalLatar: #3a1b19;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--latar);
+    color: var(--teks);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0 0 8px; }
+  p { margin: 0 0 12px; }
+  .redup { color: var(--redup); font-size: 14px; }
+  .kartu {
+    background: var(--kartu);
+    border: 1px solid var(--garis);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 14px 0;
+  }
+  .peringatan { border-color: var(--gagal); background: var(--gagalLatar); }
+  dl { margin: 0; display: grid; grid-template-columns: 1fr; gap: 2px 0; }
+  dt { font-size: 13px; color: var(--redup); margin-top: 8px; }
+  dd { margin: 0; word-break: break-all; font-weight: 600; }
+  .lulus { color: var(--lulus); }
+  .gagal { color: var(--gagal); }
+  button {
+    font: inherit;
+    min-height: 44px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--garis);
+    background: var(--kartu);
+    color: var(--teks);
+    cursor: pointer;
+  }
+  button.utama { background: var(--aksen); border-color: var(--aksen); color: #fff; }
+  @media (prefers-color-scheme: dark) { button.utama { color: #0b1a33; } }
+  .baris { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  #tombolGoogle { min-height: 44px; margin: 8px 0; }
+  code { background: var(--latar); padding: 1px 5px; border-radius: 4px; font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Uji kelayakan login</h1>
+  <p class="redup">Halaman ini hanya untuk uji. Tidak menyimpan apa pun, tidak membuka aplikasi sekolah, dan tidak meminta sandi baru.</p>
+
+  <section class="kartu peringatan" id="kartuKonfigurasi" hidden>
+    <h2>Belum dikonfigurasi</h2>
+    <p id="teksKonfigurasi"></p>
+  </section>
+
+  <section class="kartu">
+    <h2>1. Masuk dengan akun Google</h2>
+    <p class="redup">Pilih akun yang sedang diuji. Jika ada beberapa akun terbuka di browser, pastikan yang dipilih benar.</p>
+    <div id="tombolGoogle"></div>
+    <div class="baris">
+      <button type="button" id="tombolKeluar">Lepas pilihan akun</button>
+      <button type="button" id="tombolPalsu">Uji token palsu</button>
+    </div>
+  </section>
+
+  <section class="kartu" id="kartuHasil" hidden aria-live="polite">
+    <h2>2. Hasil</h2>
+    <dl>
+      <dt>Email menurut Google (dibaca di browser)</dt>
+      <dd id="hEmailBrowser">-</dd>
+      <dt>Email terverifikasi menurut backend</dt>
+      <dd id="hEmailBackend">-</dd>
+      <dt>Bentuk normal untuk pencocokan</dt>
+      <dd id="hNormal">-</dd>
+      <dt>Terdaftar di sheet uji</dt>
+      <dd id="hTerdaftar">-</dd>
+      <dt>Status backend</dt>
+      <dd id="hStatus">-</dd>
+      <dt>Waktu total</dt>
+      <dd id="hWaktu">-</dd>
+      <dt>Perangkat</dt>
+      <dd id="hPerangkat">-</dd>
+    </dl>
+    <div class="baris">
+      <button type="button" class="utama" id="tombolSalin">Salin ringkasan</button>
+    </div>
+    <p class="redup" id="infoSalin" style="margin-top:8px"></p>
+  </section>
+
+  <section class="kartu" id="kartuPalsu" hidden aria-live="polite">
+    <h2>Uji token palsu</h2>
+    <p id="hasilPalsu"></p>
+  </section>
+
+  <p class="redup">Token login hanya ada di memori halaman ini dan tidak ditampilkan. Tutup tab untuk menghapusnya.</p>
+</main>
+
+<script src="config.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="window.gsiSiap && window.gsiSiap()"></script>
+<script>
+(function () {
+  "use strict";
+
+  var cfg = window.UJI || {};
+  var ringkasanTerakhir = "";
+
+  function el(id) { return document.getElementById(id); }
+
+  function ubah(id, teks, kelas) {
+    var node = el(id);
+    node.textContent = teks;
+    node.className = kelas || "";
+  }
+
+  function periksaKonfigurasi() {
+    var kurang = [];
+    if (!cfg.clientId) kurang.push("clientId");
+    if (!cfg.backendUrl) kurang.push("backendUrl");
+    if (kurang.length) {
+      el("kartuKonfigurasi").hidden = false;
+      el("teksKonfigurasi").textContent =
+        "Nilai berikut masih kosong di config.js: " + kurang.join(", ") + ". Isi dulu, lalu muat ulang halaman.";
+      return false;
+    }
+    return true;
+  }
+
+  /** Membaca isi token hanya untuk ditampilkan. Pemeriksaan sebenarnya dilakukan backend. */
+  function bacaIsiToken(token) {
+    try {
+      var bagian = token.split(".")[1].replace(/-/g, "+").replace(/\x5f/g, "/");
+      while (bagian.length % 4) bagian += "=";
+      var teks = decodeURIComponent(
+        atob(bagian).split("").map(function (c) {
+          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join("")
+      );
+      return JSON.parse(teks);
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function kirim(token) {
+    var mulai = performance.now();
+    return fetch(cfg.backendUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: token }),
+      redirect: "follow"
+    })
+      .then(function (r) { return r.text(); })
+      .then(function (teks) {
+        var j;
+        try { j = JSON.parse(teks); } catch (err) { j = { ok: false, alasan: "Balasan backend bukan JSON" }; }
+        j.waktuMs = Math.round(performance.now() - mulai);
+        return j;
+      })
+      .catch(function (err) {
+        return { ok: false, alasan: "Gagal menghubungi backend: " + err.message, waktuMs: Math.round(performance.now() - mulai) };
+      });
+  }
+
+  function ringkasPerangkat() {
+    var lebar = window.innerWidth + "x" + window.innerHeight;
+    return navigator.userAgent.slice(0, 120) + " | layar " + lebar;
+  }
+
+  function tampilkanHasil(emailBrowser, j) {
+    el("kartuHasil").hidden = false;
+    ubah("hEmailBrowser", emailBrowser || "(tidak terbaca)");
+    ubah("hEmailBackend", j.ok ? j.email : "-");
+    ubah("hNormal", j.ok ? j.normal : "-");
+    if (j.ok) {
+      ubah("hTerdaftar", j.terdaftar ? "Ya" : "Tidak", j.terdaftar ? "lulus" : "gagal");
+      ubah("hStatus", "Berhasil", "lulus");
+    } else {
+      ubah("hTerdaftar", "-");
+      ubah("hStatus", "Ditolak: " + (j.alasan || "tanpa keterangan"), "gagal");
+    }
+    var cepat = j.waktuMs <= 3000;
+    ubah("hWaktu", j.waktuMs + " ms" + (cepat ? " (dalam 3 detik)" : " (lebih dari 3 detik)"), cepat ? "lulus" : "gagal");
+    ubah("hPerangkat", ringkasPerangkat());
+
+    ringkasanTerakhir = [
+      "B",
+      "waktu: " + new Date().toLocaleString("id-ID"),
+      "browser: " + (emailBrowser || "-"),
+      "backend: " + (j.ok ? j.email : "ditolak (" + (j.alasan || "?") + ")"),
+      "terdaftar: " + (j.ok ? (j.terdaftar ? "ya" : "tidak") : "-"),
+      "waktu total: " + j.waktuMs + " ms",
+      "perangkat: " + ringkasPerangkat()
+    ].join(" | ");
+    el("infoSalin").textContent = "";
+  }
+
+  function saatToken(respon) {
+    var token = respon && respon.credential;
+    if (!token) {
+      tampilkanHasil("", { ok: false, alasan: "Google tidak mengirim token", waktuMs: 0 });
+      return;
+    }
+    var isi = bacaIsiToken(token);
+    ubah("hStatus", "Menghubungi backend...");
+    el("kartuHasil").hidden = false;
+    kirim(token).then(function (j) { tampilkanHasil(isi.email, j); });
+  }
+
+  function ujiPalsu() {
+    el("kartuPalsu").hidden = false;
+    ubah("hasilPalsu", "Mengirim token palsu...");
+    kirim("token-palsu-untuk-uji-penolakan-0123456789").then(function (j) {
+      var node = el("hasilPalsu");
+      if (j.ok) {
+        node.textContent = "GAGAL UJI: backend menerima token palsu. Jangan lanjut sebelum diperbaiki.";
+        node.className = "gagal";
+      } else {
+        node.textContent = "Lulus: token palsu ditolak. Alasan dari backend: " + (j.alasan || "tanpa keterangan") + " (" + j.waktuMs + " ms)";
+        node.className = "lulus";
+      }
+    });
+  }
+
+  function salin() {
+    if (!ringkasanTerakhir) return;
+    var info = el("infoSalin");
+    function sukses() { info.textContent = "Tersalin. Tempelkan ke catatan hasil uji."; }
+    function cadangan() {
+      var area = document.createElement("textarea");
+      area.value = ringkasanTerakhir;
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      try { document.execCommand("copy"); sukses(); } catch (err) { info.textContent = "Salin otomatis gagal. Salin manual: " + ringkasanTerakhir; }
+      document.body.removeChild(area);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(ringkasanTerakhir).then(sukses, cadangan);
+    } else {
+      cadangan();
+    }
+  }
+
+  var sudahSiap = false;
+  window.gsiSiap = function () {
+    if (sudahSiap) return;
+    if (!periksaKonfigurasi() || !window.google || !google.accounts) return;
+    sudahSiap = true;
+    google.accounts.id.initialize({
+      client_id: cfg.clientId,
+      callback: saatToken,
+      auto_select: false
+    });
+    google.accounts.id.renderButton(el("tombolGoogle"), {
+      theme: "outline",
+      size: "large",
+      text: "signin_with",
+      locale: "id"
+    });
+  };
+
+  el("tombolKeluar").addEventListener("click", function () {
+    if (window.google && google.accounts) google.accounts.id.disableAutoSelect();
+    ringkasanTerakhir = "";
+    el("kartuHasil").hidden = true;
+  });
+  el("tombolPalsu").addEventListener("click", function () {
+    if (periksaKonfigurasi()) ujiPalsu();
+  });
+  el("tombolSalin").addEventListener("click", salin);
+
+  periksaKonfigurasi();
+  if (window.google && google.accounts) window.gsiSiap();
+})();
+</script>
+</body>
+</html>
