@@ -9,5 +9,5 @@
  */
 window.UJI = {
   clientId: '823310669789-nac1a9bb9acn9eqgmhq8gbrr59nsrsh8.apps.googleusercontent.com',
-  backendUrl: '823310669789-nac1a9bb9acn9eqgmhq8gbrr59nsrsh8.apps.googleusercontent.com'
+  backendUrl:'https://script.google.com/macros/s/AKfycbzjBudK_aQV2ijsQfYkmZV9myT_hxe782WK2rlfGeKmE1k_eMjGF8gCtClD1e_UmNcaxw/exec'
 };
